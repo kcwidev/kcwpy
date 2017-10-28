@@ -1,0 +1,25 @@
+#!/bin/bash -f
+
+source activate astroconda
+
+KCWIPATH=$HOME/kcwi/kcwpy
+
+# if [ -z ${PYTHONPATH+X} ]
+# then PYTHONPATH=${PYTHONPATH}:${KCWIPATH}
+# else
+PYTHONPATH=${KCWIPATH}
+# fi
+export PYTHONPATH
+
+if [ "$#" -eq 0 ]
+then 
+    echo "Starting Python"
+    ipython --pylab --colors LightBG
+else
+    case $1 in
+        what) python $KCWIPATH/util/What.py "$@";;
+        *) python -u "$@";;
+    esac
+fi
+exit
+

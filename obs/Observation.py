@@ -1,6 +1,8 @@
 """ Observation class for KCWI"""
 
-import astropy as ap
+from astropy.time import Time
+from astropy import units as u
+from astropy.coordinates import SkyCoord
 
 
 class Observation:
@@ -16,12 +18,13 @@ class Observation:
     obs_type = None  # Type of observation: obj, cal, test
     img_type = None  # Type of image: obj, sky, tflat, dflat, cflat,
     #  arcflat, cbars, arcbars, test
-    coords = None  # Coordinate object specifying telescope coords
+    image_coords = None  # Coordinate object specifying image center
+    targ_coords = None  # Coordinate object specifying target coords
     observer = None
     telescope = None
     instrument = None
-    datepclr = None
-    daterend = None
+    datepclr = None  # Date of pre-clear
+    daterend = None  # Date of readout end
     el = None  # Telescope elevation in degrees
     az = None  # Telescope azimuth in degrees
     parang = None  # Parallactic angle in degrees
@@ -99,3 +102,20 @@ class Observation:
             self.targname = hdr['TARGNAME']
         if 'INSTRUME' in hdr:
             self.instrument = hdr['INSTRUME']
+        else:
+            self.instrument = 'KCWI'
+        if 'OBSERVER' in hdr:
+            self.observer = hdr['OBSERVER']
+        if 'TELESCOP' in hdr:
+            self.telescope = hdr['TELESCOPE']
+        else:
+            self.telescope = 'Keck2'
+        if 'DATEPCLR' in hdr:
+            self.date_obs = Time(hdr['DATEPCLR'],format='isot',
+                                 scale='utc')
+        if 'TARGRA' in hdr and 'TARGDEC' in hdr:
+            self.targ_coords = SkyCoord(hdr['TARGRA'], hdr['TARGDEC'],
+                                        unit=(u.hourangle, u.deg))
+        if 'RA' in hdr and 'DEC' in hdr:
+            self.image_coords = SkyCoord(hdr['RA'], hdr['DEC'],
+                                         unit=(u.hourangle, u.deg))
