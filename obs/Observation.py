@@ -16,7 +16,7 @@ class Observation:
     object = None  # Object name
     targname = None  # Target name
     obs_type = None  # Type of observation: obj, cal, test
-    img_type = None  # Type of image: obj, sky, tflat, dflat, cflat,
+    imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
     #  arcflat, cbars, arcbars, test
     image_coords = None  # Coordinate object specifying image center
     targ_coords = None  # Coordinate object specifying target coords
@@ -71,6 +71,7 @@ class Observation:
     tmpbccd = None  # Blue CCD temperature
     tmpbench = None  # Optical Bench tempaerture
     illum = None  # Illumination source: (sky, FeAr, ThAr, Cont)
+    numopen = None  # Number of shutter opens in exposure
     biasrn1 = None  # Amp 1 readnoise in e- from bias
     biasrn2 = None  # Amp 2 readnoise in e- from bias
     biasrn3 = None  # Amp 3 readnoise in e- from bias
@@ -97,47 +98,68 @@ class Observation:
     def __init__(self, hdr):
         """Initialize observation object using fits header"""
 
-        if 'OBJECT' in hdr:
+        if header_integrity(hdr):
+
+            # Basic observation parameters
             self.object = hdr['OBJECT']
-        if 'TARGNAME' in hdr:
             self.targname = hdr['TARGNAME']
-        if 'INSTRUME' in hdr:
             self.instrument = hdr['INSTRUME']
-        else:
-            self.instrument = 'KCWI'
-        if 'OBSERVER' in hdr:
             self.observer = hdr['OBSERVER']
-        if 'TELESCOP' in hdr:
             self.telescope = hdr['TELESCOPE']
-        else:
-            self.telescope = 'Keck2'
-        if 'DATEPCLR' in hdr:
             self.date_obs = Time(hdr['DATEPCLR'], format='isot',
                                  scale='utc')
-        if 'TARGRA' in hdr and 'TARGDEC' in hdr:
             self.targ_coords = SkyCoord(hdr['TARGRA'], hdr['TARGDEC'],
                                         unit=(u.hourangle, u.deg))
-        if 'RA' in hdr and 'DEC' in hdr:
             self.image_coords = SkyCoord(hdr['RA'], hdr['DEC'],
                                          unit=(u.hourangle, u.deg))
-        if 'HATPOS' in hdr:
+            # Detector configuration
+            self.xposure = hdr['XPOSURE']
+            self.telapse = hdr['TELAPSE']
+            self.numopen = hdr['NUMOPEN']
+            # Determine illumination: default is 'Test'
+            self.illum = 'Test'
             self.hatpos = hdr['HATPOS']
-        if 'CALMNAM' in hdr:
             self.calmnam = hdr['CALMNAM'].rstrip()
-        if 'Mirror' in self.calmnam:
-            self.illum = 'Cal'
-            if 'LMP0STAT' in hdr and 'LMP0SHST' in hdr:
-                if hdr['LMP0STAT'] and hdr['LMP0SHST']:
-                    self.illum = hdr['LMP0NAM'].rstrip()
-            if 'LMP1STAT' in hdr and 'LMP1SHST' in hdr:
-                if hdr['LMP1STAT'] and hdr['LMP1SHST']:
-                    self.illum = hdr['LMP1NAM'].rstrip()
-            if 'LMP3STAT' in hdr:
-                if hdr['LMP3STAT']:
-                    self.illum = hdr['LMP3NAM'].rstrip()
-        else:
-            if 'Open' in self.hatpos:
-                self.illum = 'Sky'
+            # Internal Cal mirror position
+            if 'Mirror' in self.calmnam:
+                if 'Closed' in self.hatpos:
+                    self.illum = 'IntCal'
+                    if hdr['LMP0STAT'] and hdr['LMP0SHST']:
+                        self.illum = hdr['LMP0NAM'].rstrip()
+                    if hdr['LMP1STAT'] and hdr['LMP1SHST']:
+                        self.illum = hdr['LMP1NAM'].rstrip()
+                    if hdr['LMP3STAT']:
+                        self.illum = hdr['LMP3NAM'].rstrip()
+            # External Cal mirror position
             else:
-                self.illum = 'Test'
+                if 'Open' in self.hatpos:
+                    self.illum = 'Sky'
 
+            # Determine image type: default is 'test'
+            self.imgtype = 'test'
+            if 'CALTYPE' in hdr:
+                self.caltype = hdr['CALTYPE'].rstrip()
+
+
+def header_integrity(hdr):
+    """ Test the integrity of the input KCWI image header"""
+
+    # Keywords that are essential
+    keys_err = ['DATEPCLR', 'RA', 'DEC', 'TARGRA', 'TARGDEC', 'XPOSURE',
+                'TELAPSE', 'NUMOPEN',
+                'HATPOS', 'CALMNAM', 'LMP0STAT', 'LMP0SHST', 'LMP1STAT',
+                'LMP1SHST', 'LMP3STAT']
+    # Keywords that should be there, but are not essential
+    keys_warn = ['OBJECT', 'TARGNAME', 'OBSERVER']
+
+    # Check essential keywords
+    for k in keys_err:
+        if k not in hdr:
+            print("KCWPY Error - Missing FITS keyword %s" % k)
+            return False
+    # Check non-essential keywords
+    for k in keys_warn:
+        if k not in hdr:
+            print("KCWPY Warning - Missing FITS keyword %s" % k)
+
+    return True
