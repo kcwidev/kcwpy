@@ -100,14 +100,17 @@ class Observation:
 
         if header_integrity(hdr):
 
+            self.telescope = 'Keck2'
+
             # Basic observation parameters
             self.object = hdr['OBJECT']
             self.targname = hdr['TARGNAME']
             self.instrument = hdr['INSTRUME']
             self.observer = hdr['OBSERVER']
-            self.telescope = hdr['TELESCOPE']
+            # Date of observation
             self.date_obs = Time(hdr['DATEPCLR'], format='isot',
                                  scale='utc')
+            # Coords
             self.targ_coords = SkyCoord(hdr['TARGRA'], hdr['TARGDEC'],
                                         unit=(u.hourangle, u.deg))
             self.image_coords = SkyCoord(hdr['RA'], hdr['DEC'],
@@ -139,27 +142,23 @@ class Observation:
             self.imgtype = 'test'
             if 'CALTYPE' in hdr:
                 self.caltype = hdr['CALTYPE'].rstrip()
+        else:
+            print("KCWPY Error - bad header")
 
 
 def header_integrity(hdr):
     """ Test the integrity of the input KCWI image header"""
 
     # Keywords that are essential
-    keys_err = ['DATEPCLR', 'RA', 'DEC', 'TARGRA', 'TARGDEC', 'XPOSURE',
-                'TELAPSE', 'NUMOPEN',
+    keys_err = ['OBJECT', 'TARGNAME', 'OBSERVER', 'DATEPCLR', 'RA', 'DEC',
+                'TARGRA', 'TARGDEC', 'XPOSURE', 'TELAPSE', 'NUMOPEN',
                 'HATPOS', 'CALMNAM', 'LMP0STAT', 'LMP0SHST', 'LMP1STAT',
                 'LMP1SHST', 'LMP3STAT']
-    # Keywords that should be there, but are not essential
-    keys_warn = ['OBJECT', 'TARGNAME', 'OBSERVER']
 
-    # Check essential keywords
+    # Check keywords
     for k in keys_err:
         if k not in hdr:
             print("KCWPY Error - Missing FITS keyword %s" % k)
             return False
-    # Check non-essential keywords
-    for k in keys_warn:
-        if k not in hdr:
-            print("KCWPY Warning - Missing FITS keyword %s" % k)
 
     return True
