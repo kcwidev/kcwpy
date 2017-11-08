@@ -21,7 +21,14 @@ class Observation:
     observer = None
     airmass = None  # Airmass
     frameno = None  # image number
+    obsfname = None  # Original filename for observation
+    obsdir = None  # Original directory for observation
     date_obs = None  # Date object specifying observation time
+
+    # WMKO program/state info
+    progname = None  # Program name
+    statename = None  # State name
+    stateid = None  # State ID
 
     # Pointing
     image_coords = None  # Coordinate object specifying image center
@@ -55,27 +62,24 @@ class Observation:
     xsize = None  # Size of raw image in X
     ysize = None  # Size of raw image in Y
 
-    obs_type = None  # Type of observation: obj, cal, test
-    imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
-    #  arcflat, cbars, arcbars, test
-
-    obsfname = None  # Original filename for observation
-    obsdir = None  # Original directory for observation
-    hatpos = None  # hatch position: Open or Closed
+    # Instrument configuration
     flimagin = None  # dome lamp imaging mode: on or off
     flspectr = None  # dome lamp spectra mode: on or off
+    hatpos = None  # hatch position: Open or Closed
     caltype = None  # calibration type: bias, dark, arc, etc.
-
-    skyobs = None  # sky observation? 0 - object, 1 - sky
-
-    bgratnam = None  # Blue grating id
-    bgratnum = None  # Blue graing number
-    bgrangle = None  # Blue grating angle (degrees)
-    bgrenc = None  # Blue grating rotator encoder steps
+    calmnam = None  # Cal mirror position name ('Sky', 'Mirror', 'Filter')
+    calpnam = None  # Cal position name ('Sky', 'Polar', 'Lens')
+    callang = None  # Cal polarizer angle
+    ifunam = None  # Slicer name ("Small", "Medium", "Large")
+    ifunum = None  # Slicer number ( 0 - 5, -1 = unknown)
     bfiltnam = None  # Blue filter id
     bfiltnum = None  # Blue filter number
+    bgratnam = None  # Blue grating id
+    bgratnum = None  # Blue grating number
+    bgrangle = None  # Blue grating angle (degrees)
+    bgrenc = None  # Blue grating rotator encoder steps
     bartang = None  # Blue articulation angle
-    bartenc = None  # Blue cmaera articulation encoder steps
+    bartenc = None  # Blue camera articulation encoder steps
     bcwave = None  # Blue central wavelength (Ang)
     bpwave = None  # Blue peak wavelength (Ang)
     bfocpos = None  # Blue focus stage encoder steps
@@ -83,18 +87,16 @@ class Observation:
     bnasnam = None  # Blue mask position name
     bnaspos = None  # Blue mask position
 
-    calmnam = None  # Cal mirror position name ('Sky', 'Mirror', 'Filter')
-    calpnam = None  # Cal position name ('Sky', 'Polar', 'Lens')
-    callang = None  # Cal polarizer angle
-    ifunum = None  # Slicer number ( 0 -5, - 1 =unknown)
-    ifunam = None  # Slicer name ("Small", etc.)
-    cwave = None  # central wavelength (Ang)
-    gratanom = None  # grating angle anomoly (degrees)
-    wave0 = None  # blue end  of wavelength range (Ang)
-    wave1 = None  # red end of wavelength range (Ang)
-    dwav = None  # average dispersion ( Ang /pix)
+    # Temperatures
     tmpbccd = None  # Blue CCD temperature
-    tmpbench = None  # Optical Bench tempaerture
+    tmpbench = None  # Optical Bench temperature
+
+    # Derived parameters
+    obs_type = None  # Type of observation: obj, cal, test
+    imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
+    #  arcflat, cbars, arcbars, test
+    skyobs = None  # sky observation? 0 - object, 1 - sky
+
     illum = None  # Illumination source: (sky, FeAr, ThAr, Cont)
     biasrn1 = None  # Amp 1 readnoise in e- from bias
     biasrn2 = None  # Amp 2 readnoise in e- from bias
@@ -162,7 +164,9 @@ def header_integrity(hdr):
 
     # Keywords that are essential
     keys_err = ['OBJECT', 'TARGNAME', 'OBSERVER', 'AIRMASS', 'FRAMENO',
-                'DATEPCLR', 'RA', 'DEC', 'TARGRA', 'TARGDEC',
+                'OFNAME', 'OUTDIR', 'DATEPCLR', 'PROGNAME', 'STATENAM',
+                'STATEID', 'RA', 'DEC', 'TARGRA', 'TARGDEC', 'PARANG',
+                'ROTPOSN', 'ROTMODE',
                 'XPOSURE', 'TELAPSE', 'NUMOPEN',
                 'HATPOS', 'CALMNAM', 'LMP0STAT', 'LMP0SHST', 'LMP1STAT',
                 'LMP1SHST', 'LMP3STAT']
