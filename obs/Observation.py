@@ -1,8 +1,10 @@
 """ Observation class for KCWI"""
 
+import glob
 from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+import astropy.io.fits as pf
 
 
 class Observation:
@@ -20,9 +22,9 @@ class Observation:
     instrument = None
     observer = None
     airmass = None  # Airmass
-    frameno = None  # image number
-    obsfname = None  # Original filename for observation
-    obsdir = None  # Original directory for observation
+    imgnum = None  # image number
+    ofname = None  # Original filename for observation
+    outdir = None  # Original directory for observation
     date_obs = None  # Date object specifying observation time
 
     # WMKO program/state info
@@ -42,67 +44,62 @@ class Observation:
     xposure = None  # Shutter open duration (s)
     telapse = None  # Dark current duration (s)
     numopen = None  # Number of shutter opens in exposure
-    shuffmod = None  # is this a Nod & Shuffle observation?
+
     shufrows = None  # Number of CCD rows shuffled
-    nsskyr0 = None  # Sky region row 0 (bottom, pix)
-    nsskyr1 = None  # Sky region row 1 (top, pix)
-    nsobjr0 = None  # Object region row 0 (bottom, pix)
-    nsobjr1 = None  # Object region row 1 (top, pix)
     ccdmode = None  # CCD mode (0-slow, 1-fast)
     ampmode = None  # Amp mode name (ALL, TBO, TUP, C, D, E, F)
     nvidinp = None  # Number of amps
     nampsxy = None  # Number of amplifiers in x and y
     gainmul = None  # Gain multiplier (1, 2, 5, 10)
+    ccdgain = None  # Average CCD gain in e-/DN
     gain1 = None  # Amp 1 gain in e-/DN
     gain2 = None  # Amp 2 gain in e-/DN
     gain3 = None  # Amp 3 gain in e-/DN
     gain4 = None  # Amp 4 gain in e-/DN
+
+    # Instrument configuration
+    dome = None  # dome lamp on: True or False
+    hatch = None  # hatch position: Open or Closed
+    caltype = None  # calibration type: bias, dark, arc, etc.
+    calmnam = None  # Cal mirror position name ('Sky', 'Mirror', 'Filter')
+    calpnam = None  # Cal position name ('Sky', 'Polar', 'Lens')
+    polang = None  # Cal polarizer angle
+    slicer = None  # Slicer name ("Small", "Medium", "Large")
+    ifunum = None  # Slicer number ( 0 - 5, -1 = unknown)
+    filter = None  # Blue filter id
+    bfiltnum = None  # Blue filter number
+    grating = None  # Blue grating id
+    bgratnum = None  # Blue grating number
+    grangle = None  # Blue grating angle (degrees)
+    artang = None  # Blue articulation angle
+    cwave = None  # Blue central wavelength (Ang)
+    pwave = None  # Blue peak wavelength (Ang)
+    focus = None  # Blue focus (mm)
+
+    # Temperatures
+    bccdtemp = None  # Blue CCD temperature
+    benchtemp = None  # Optical Bench temperature
+
+    # Derived parameters
+    obstype = None  # Type of observation: obj, cal, test
+    imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
+    #  arcflat, cbars, arcbars, test
+    skyobs = None  # sky observation? 0 - object, 1 - sky
+    shuffmod = None  # is this a Nod & Shuffle observation? True or False
+    nasmask = None  # Nod-and-Shuffle mask in? True or False
+    nsskyr0 = None  # Sky region row 0 (bottom, pix)
+    nsskyr1 = None  # Sky region row 1 (top, pix)
+    nsobjr0 = None  # Object region row 0 (bottom, pix)
+    nsobjr1 = None  # Object region row 1 (top, pix)
     xbinsize = None  # Binning in X
     ybinsize = None  # Binning in Y
     xsize = None  # Size of raw image in X
     ysize = None  # Size of raw image in Y
-
-    # Instrument configuration
-    flimagin = None  # dome lamp imaging mode: on or off
-    flspectr = None  # dome lamp spectra mode: on or off
-    hatpos = None  # hatch position: Open or Closed
-    caltype = None  # calibration type: bias, dark, arc, etc.
-    calmnam = None  # Cal mirror position name ('Sky', 'Mirror', 'Filter')
-    calpnam = None  # Cal position name ('Sky', 'Polar', 'Lens')
-    callang = None  # Cal polarizer angle
-    ifunam = None  # Slicer name ("Small", "Medium", "Large")
-    ifunum = None  # Slicer number ( 0 - 5, -1 = unknown)
-    bfiltnam = None  # Blue filter id
-    bfiltnum = None  # Blue filter number
-    bgratnam = None  # Blue grating id
-    bgratnum = None  # Blue grating number
-    bgrangle = None  # Blue grating angle (degrees)
-    bgrenc = None  # Blue grating rotator encoder steps
-    bartang = None  # Blue articulation angle
-    bartenc = None  # Blue camera articulation encoder steps
-    bcwave = None  # Blue central wavelength (Ang)
-    bpwave = None  # Blue peak wavelength (Ang)
-    bfocpos = None  # Blue focus stage encoder steps
-    bfocus = None  # Blue focus (mm)
-    bnasnam = None  # Blue mask position name
-    bnaspos = None  # Blue mask position
-
-    # Temperatures
-    tmpbccd = None  # Blue CCD temperature
-    tmpbench = None  # Optical Bench temperature
-
-    # Derived parameters
-    obs_type = None  # Type of observation: obj, cal, test
-    imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
-    #  arcflat, cbars, arcbars, test
-    skyobs = None  # sky observation? 0 - object, 1 - sky
-
     illum = None  # Illumination source: (sky, FeAr, ThAr, Cont)
     biasrn1 = None  # Amp 1 readnoise in e- from bias
     biasrn2 = None  # Amp 2 readnoise in e- from bias
     biasrn3 = None  # Amp 3 readnoise in e- from bias
     biasrn4 = None  # Amp 4 readnoise in e- form bias
-
     exptime = None  # Exposure time (s)
 
     def __init__(self, hdr):
@@ -116,45 +113,128 @@ class Observation:
             self.instrument = hdr['INSTRUME']
             self.observer = hdr['OBSERVER']
             self.airmass = hdr['AIRMASS']
-            self.frameno = hdr['FRAMENO']
-
-            # Date of observation
+            self.imgnum = hdr['FRAMENO']
+            self.ofname = hdr['OFNAME']
+            self.outdir = hdr['OUTDIR']
             self.date_obs = Time(hdr['DATEPCLR'], format='isot',
                                  scale='utc')
-            # Coords
+            # WMKO program info
+            self.progname = hdr['PROGNAME']
+            self.statename = hdr['STATENAM']
+            self.stateid = hdr['STATEID']
+            # Pointing
             self.image_coords = SkyCoord(hdr['RA'], hdr['DEC'],
                                          unit=(u.hourangle, u.deg))
             self.targ_coords = SkyCoord(hdr['TARGRA'], hdr['TARGDEC'],
                                         unit=(u.hourangle, u.deg))
-
+            self.parang = hdr['PARANG']
+            self.rotposn = hdr['ROTPOSN']
+            self.rotmode = hdr['ROTMODE']
             # Detector configuration
             self.xposure = hdr['XPOSURE']
             self.telapse = hdr['TELAPSE']
+            self.exptime = self.xposure
             self.numopen = hdr['NUMOPEN']
-
+            self.ccdmode = hdr['CCDMODE']
+            self.ampmode = hdr['AMPMODE']
+            self.nvidinp = hdr['NVIDINP']
+            self.nampsxy = hdr['NAMPSXY']
+            self.gainmul = hdr['GAINMUL']
+            self.ccdgain = hdr['CCDGAIN']
+            self.gain1 = hdr['GAIN1']
+            if self.nvidinp > 1:
+                self.gain2 = hdr['GAIN2']
+                if self.nvidinp > 2:
+                    self.gain3 = hdr['GAIN3']
+                    if self.nvidinp > 3:
+                        self.gain4 = hdr['GAIN4']
+            self.xsize = hdr['NAXIS1']
+            self.ysize = hdr['NAXIS2']
+            self.xbinsize = int(hdr['CCDSUM'].split()[0])
+            self.ybinsize = int(hdr['CCDSUM'].split()[1])
+            self.shufrows = hdr['SHUFROWS']
+            if hdr['NSHFUP'] > 0 or hdr['NSHFDN'] > 0:
+                self.shuffmod = True
+                self.nsskyr0 = 1
+                self.nsskyr1 = self.shufrows
+                self.nsobjr0 = self.nsskyr1 + 1
+                self.nsobjr1 = self.nsobjr0 + self.shufrows - 1
+            else:
+                self.shuffmod = False
+            # Instrument configuration
+            self.dome = ('on' in hdr['FLIMAGIN'] or 'on' in hdr['FLSPECTR'])
+            self.hatch = hdr['HATPOS']
+            self.caltype = hdr['CALTYPE']
+            self.calmnam = hdr['CALMNAM']
+            self.calpnam = hdr['CALPNAM']
+            self.polang = hdr['CALLANG']
+            self.slicer = hdr['IFUNAM']
+            self.ifunum = hdr['IFUNUM']
+            self.filter = hdr['BFILTNAM']
+            self.bfiltnum = hdr['BFILTNUM']
+            self.grating = hdr['BGRATNAM']
+            self.gratnum = hdr['BGRATNUM']
+            self.grangle = hdr['BGRANGLE']
+            self.artang = hdr['BARTANG']
+            self.cwave = hdr['BCWAVE']
+            self.pwave = hdr['BPWAVE']
+            self.focus = hdr['BFOCMM']
+            if 'Mask' in hdr['BNASNAM']:
+                self.nasmask = True
+            else:
+                self.nasmask = False
+            # Temperatures
+            self.bccdtemp = hdr['BCCDTMP']
+            self.benchtemp = hdr['TMPA7']
             # Determine illumination: default is 'Test'
             self.illum = 'Test'
-            self.hatpos = hdr['HATPOS']
-            self.calmnam = hdr['CALMNAM'].rstrip()
-            # Internal Cal mirror position
             if 'Mirror' in self.calmnam:
-                if 'Closed' in self.hatpos:
+                if 'Closed' in self.hatch:
                     self.illum = 'IntCal'
                     if hdr['LMP0STAT'] and hdr['LMP0SHST']:
-                        self.illum = hdr['LMP0NAM'].rstrip()
+                        self.illum = hdr['LMP0NAM']
                     if hdr['LMP1STAT'] and hdr['LMP1SHST']:
-                        self.illum = hdr['LMP1NAM'].rstrip()
+                        self.illum = hdr['LMP1NAM']
                     if hdr['LMP3STAT']:
-                        self.illum = hdr['LMP3NAM'].rstrip()
+                        self.illum = hdr['LMP3NAM']
             # External Cal mirror position
             else:
-                if 'Open' in self.hatpos:
+                if 'Open' in self.hatch:
                     self.illum = 'Sky'
-
-            # Determine image type: default is 'test'
-            self.imgtype = 'test'
-            if 'CALTYPE' in hdr:
-                self.caltype = hdr['CALTYPE'].rstrip()
+                    if self.dome:
+                        self.illum = 'Dome'
+            # Determine image/observation type
+            self.imgtype = self.caltype
+            if 'object' in self.caltype:
+                if 'Open' in self.hatch:
+                    if self.dome:
+                        self.imgtype = 'dflat'
+                        self.obstype = 'cal'
+                    else:
+                        self.imgtype = 'object'
+                        self.obstype = 'obj'
+                else:
+                    self.imgtype = 'test'
+                    self.obstype = 'test'
+            elif 'arc' in self.caltype:
+                self.imgtype = 'arc'
+                self.obstype = 'cal'
+            elif 'cbars' in self.caltype or 'cflat' in self.caltype:
+                self.obstype = 'cal'
+            elif 'dark' in self.caltype or 'Dark' in hdr['BNASNAM'] or \
+                    (self.xposure == 0. and self.telapse > 0.1):
+                self.imgtype = 'dark'
+                self.obstype = 'zero'
+                self.exptime = self.telapse
+            elif self.xposure == 0. and self.telapse <= 0.1:
+                self.imgtype = 'bias'
+                self.obstype = 'zero'
+            # Check for direct mode
+            if 'None' in self.grating and self.artang < 5.:
+                self.obstype = 'direct-' + self.obstype
+                if 'test' in self.imgtype:
+                    self.imgtype = 'object'
+                    self.obstype = 'direct-cal'
         else:
             print("KCWPY Error - bad header")
 
@@ -166,10 +246,15 @@ def header_integrity(hdr):
     keys_err = ['OBJECT', 'TARGNAME', 'OBSERVER', 'AIRMASS', 'FRAMENO',
                 'OFNAME', 'OUTDIR', 'DATEPCLR', 'PROGNAME', 'STATENAM',
                 'STATEID', 'RA', 'DEC', 'TARGRA', 'TARGDEC', 'PARANG',
-                'ROTPOSN', 'ROTMODE',
-                'XPOSURE', 'TELAPSE', 'NUMOPEN',
-                'HATPOS', 'CALMNAM', 'LMP0STAT', 'LMP0SHST', 'LMP1STAT',
-                'LMP1SHST', 'LMP3STAT']
+                'ROTPOSN', 'ROTMODE', 'XPOSURE', 'TELAPSE', 'NUMOPEN',
+                'NSHFUP', 'NSHFDN', 'SHUFROWS',
+                'CCDMODE', 'AMPMODE', 'NVIDINP', 'NAMPSXY', 'CCDSUM',
+                'GAINMUL', 'CCDGAIN', 'GAIN1', 'FLIMAGIN', 'FLSPECTR',
+                'HATPOS', 'CALTYPE', 'CALMNAM', 'CALPNAM', 'CALLANG',
+                'IFUNAM', 'IFUNUM', 'BFILTNAM', 'BFILTNUM', 'BGRATNAM',
+                'BGRATNUM', 'BGRANGLE', 'BGRENC', 'BARTANG', 'BARTENC',
+                'BCWAVE', 'BPWAVE', 'BFOCMM', 'BFOCENC', 'BNASNAM',
+                'LMP0STAT', 'LMP0SHST', 'LMP1STAT', 'LMP1SHST', 'LMP3STAT']
 
     # Check keywords
     for k in keys_err:
@@ -178,3 +263,23 @@ def header_integrity(hdr):
             return False
 
     return True
+
+
+def read_headers(fspec=None):
+    """ Read in fits files and return array of Observation structures """
+
+    if fspec is None:
+        fspec = './kb*.fits'
+
+    # get file list
+    flist = glob.glob(fspec)
+
+    # loop over files
+    obs = []
+    for f in flist:
+        print(f)
+        ff = pf.open(f)
+        ob = Observation(ff[0].header)
+        obs.append(ob)
+
+    return obs
