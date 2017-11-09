@@ -1,6 +1,7 @@
 """ Observation class for KCWI"""
 
 import glob
+import sys
 from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -84,7 +85,7 @@ class Observation:
     obstype = None  # Type of observation: obj, cal, test
     imgtype = None  # Type of image: obj, sky, tflat, dflat, cflat,
     #  arcflat, cbars, arcbars, test
-    skyobs = None  # sky observation? 0 - object, 1 - sky
+    skyobs = None  # sky observation? True or False
     shuffmod = None  # is this a Nod & Shuffle observation? True or False
     nasmask = None  # Nod-and-Shuffle mask in? True or False
     nsskyr0 = None  # Sky region row 0 (bottom, pix)
@@ -204,6 +205,7 @@ class Observation:
                     if self.dome:
                         self.illum = 'Dome'
             # Determine image/observation type
+            self.skyobs = False
             self.imgtype = self.caltype
             if 'object' in self.caltype:
                 if 'Open' in self.hatch:
@@ -265,7 +267,7 @@ def header_integrity(hdr):
     return True
 
 
-def read_headers(fspec=None):
+def read_headers(fspec=None, verbose=False):
     """ Read in fits files and return array of Observation structures """
 
     if fspec is None:
@@ -275,11 +277,43 @@ def read_headers(fspec=None):
     flist = glob.glob(fspec)
 
     # loop over files
-    obs = []
+    oblist = []
     for f in flist:
-        print(f)
+        if verbose:
+            print(f)
         ff = pf.open(f)
         ob = Observation(ff[0].header)
-        obs.append(ob)
+        oblist.append(ob)
 
-    return obs
+    return oblist
+
+
+def what(oblist):
+    """ Print out a summary of each observation in oblist. """
+
+    # header
+    hdr = """
+# R = CCD Readout Speed : 0 - slow, 1 - fast
+# G   = Gain multiplier   : 10, 5, 2, 1
+# SSM = Sky, Shuffle, Mask: 0 - no, 1 - yes'
+#  #/   N Imno   Bin AMPS R  G SSM IFU GRAT FILT     Cwave JDobs         Expt Type    Illum     Imno   RA          Dec             PA      Air  Object'"""
+    print(hdr)
+    # how many?
+    nobs = len(oblist)
+    # loop over oblist
+    for n, ob in enumerate(oblist):
+        print("%4d/%4d %7d %1d %1d %3s %1d %2d %1d%1d%1d %3s %-4s %-5s %8.1f"
+              "%12.3f%7.1f %-7s %-6s %7d %s" %
+              (n, nobs, ob.imgnum, ob.xbinsize, ob.ybinsize, ob.ampmode,
+               ob.ccdmode, ob.gainmul, (1 if ob.skyobs else 0),
+               (1 if ob.shuffmod else 0), (1 if ob.nasmask else 0),
+               ob.slicer[:3], ob.grating, ob.filter, ob.cwave, ob.date_obs.jd,
+               ob.exptime, ob.imgtype, ob.illum[:6], ob.imgnum,
+               ob.image_coords.to_string(style='decimal', precision=8)))
+
+
+if __name__ == '__main__':
+
+    filespec = sys.argv[1]
+    obslist = read_headers(filespec)
+    what(obslist)
