@@ -103,6 +103,78 @@ class Observation:
     biasrn4 = None  # Amp 4 readnoise in e- form bias
     exptime = None  # Exposure time (s)
 
+    def match_bias(self, obs=None):
+        """Does the input observation match at CCD bias level?
+
+        Checks the relevant CCD parameters to see if the input observation
+        matches such that they could use the same master bias frame.
+
+        Args:
+            obs (Observation): observation instance to match against
+
+        Returns:
+            bool: True if observation matches otherwise False
+
+        """
+
+        retval = True
+        if obs is not None:
+            # check relevant CCD parameters
+            if self.ampmode not in obs.ampmode:
+                retval = False
+            if self.ccdmode != obs.ccdmode:
+                retval = False
+            if self.xbinsize != obs.xbinsize or self.ybinsize != obs.ybinsize:
+                retval = False
+            if self.gainmul != obs.gainmul:
+                retval = False
+        # empty observation
+        else:
+            retval = False
+
+        return retval
+
+    def match_geom(self, obs=None, use_id=True, delang=0.1, delwave=0.1):
+        """Does the input observation match at Geometry Configuration level?
+
+        Checks the relevant configuration parameters to see if the input
+        observation matches such that they could use the same geometry
+        calibration.
+
+        Args:
+            obs (Observation): observation instance to match against
+
+        Returns:
+            bool: True if observation matches otherwise False
+
+        """
+
+        retval = True
+        if obs is not None:
+            # just match on state Id
+            if use_id:
+                if self.stateid not in obs.stateid:
+                    retval = False
+            # use details of config to match
+            else:
+                if self.xbinsize != obs.xbinsize or self.ybinsize != obs.ybinsize:
+                    retval = False
+                if self.grating not in obs.grating:
+                    retval = False
+                if self.filter not in obs.filter:
+                    retval = False
+                if self.slicer not in obs.slicer:
+                    retval = False
+                if abs(self.grangle - obs.grangle) > delang:
+                    retval = False
+                if abs(self.cwave - obs.cwave) > delwave:
+                    retval = False
+        # Empty observation
+        else:
+            retval = False
+
+        return retval
+
     def __init__(self, hdr):
         """Initialize observation object using fits header"""
 
@@ -190,14 +262,13 @@ class Observation:
             # Determine illumination: default is 'Test'
             self.illum = 'Test'
             if 'Mirror' in self.calmnam:
-                if 'Closed' in self.hatch:
-                    self.illum = 'IntCal'
-                    if hdr['LMP0STAT'] and hdr['LMP0SHST']:
-                        self.illum = hdr['LMP0NAM']
-                    if hdr['LMP1STAT'] and hdr['LMP1SHST']:
-                        self.illum = hdr['LMP1NAM']
-                    if hdr['LMP3STAT']:
-                        self.illum = hdr['LMP3NAM']
+                self.illum = 'IntCal'
+                if hdr['LMP0STAT'] and hdr['LMP0SHST']:
+                    self.illum = hdr['LMP0NAM']
+                if hdr['LMP1STAT'] and hdr['LMP1SHST']:
+                    self.illum = hdr['LMP1NAM']
+                if hdr['LMP3STAT']:
+                    self.illum = hdr['LMP3NAM']
             # External Cal mirror position
             else:
                 if 'Open' in self.hatch:
@@ -244,11 +315,11 @@ class Observation:
                     self.imgtype = 'bias'
                     self.obstype = 'zero'
             # Check for direct mode
-            if 'None' in self.grating and self.artang < 5.:
-                self.obstype = 'direct-' + self.obstype
+            if 'None' in self.grating and self.artang < 5. and self.exptime > 0:
+                self.obstype = 'dir-' + self.obstype
                 if 'test' in self.imgtype:
                     self.imgtype = 'object'
-                    self.obstype = 'direct-cal'
+                    self.obstype = 'dir-cal'
         else:
             print("KCWPY Error - bad header")
 
@@ -305,19 +376,20 @@ def what(oblist):
     print("# G   = Gain multiplier   : 10, 5, 2, 1")
     print("# SSM = Sky, Shuffle, Mask: 0 - no, 1 - yes")
     print("#  #/   N    Imno Bin AMP R  G SSM IFU GRAT FILT     Cwave JDobs"
-          "         Expt Type    Illum     Imno   RA          Dec            "
-          "PA     Air   Object")
+          "         Expt ObType  Type    Illum     Imno   "
+          "RA          Dec            PA     Air   Object")
     # how many?
     nobs = len(oblist)
     # loop over oblist
     for n, ob in enumerate(oblist):
         print("%4d/%4d %7d %1d %1d %3s %1d %2d %1d%1d%1d %3s %-4s %-5s %8.1f"
-              "%12.3f%7.1f %-7s %-6s %7d%13.8f%13.8f %7.2f %7.3f %s" %
+              "%12.3f%7.1f %-7s %-7s %-6s %7d%13.8f%13.8f %7.2f %7.3f %s" %
               (n, nobs, ob.imgnum, ob.xbinsize, ob.ybinsize, ob.ampmode,
                ob.ccdmode, ob.gainmul, (1 if ob.skyobs else 0),
                (1 if ob.shuffmod else 0), (1 if ob.nasmask else 0),
                ob.slicer[:3], ob.grating[:4], ob.filter, ob.cwave,
-               ob.date_obs.jd, ob.exptime, ob.imgtype, ob.illum[:6], ob.imgnum,
+               ob.date_obs.jd, ob.exptime,
+               ob.obstype, ob.imgtype, ob.illum[:6], ob.imgnum,
                ob.image_coords.ra.degree, ob.image_coords.dec.degree,
                ob.rotposn, ob.airmass,
                (ob.targname if 'object' in ob.imgtype else '-')))
