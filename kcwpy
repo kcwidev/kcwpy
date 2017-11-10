@@ -17,7 +17,7 @@ then
     ipython --pylab --colors LightBG
 else
     case $1 in
-        what) python $KCWIPATH/util/What.py "$@";;
+        what) python $KCWIPATH/obs/Observation.py "$@";;
         *) python -u "$@";;
     esac
 fi

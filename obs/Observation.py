@@ -207,6 +207,7 @@ class Observation:
             # Determine image/observation type
             self.skyobs = False
             self.imgtype = self.caltype
+            self.obstype = 'test'
             if 'object' in self.caltype:
                 if 'Open' in self.hatch:
                     if self.dome:
@@ -223,14 +224,25 @@ class Observation:
                 self.obstype = 'cal'
             elif 'cbars' in self.caltype or 'cflat' in self.caltype:
                 self.obstype = 'cal'
-            elif 'dark' in self.caltype or 'Dark' in hdr['BNASNAM'] or \
-                    (self.xposure == 0. and self.telapse > 0.1):
-                self.imgtype = 'dark'
-                self.obstype = 'zero'
-                self.exptime = self.telapse
-            elif self.xposure == 0. and self.telapse <= 0.1:
-                self.imgtype = 'bias'
-                self.obstype = 'zero'
+            elif 'dark' in self.caltype or 'Dark' in hdr['BNASNAM']:
+                self.illum = 'None'
+                if self.xposure == 0. and self.telapse > 0.1:
+                    self.imgtype = 'dark'
+                    self.obstype = 'zero'
+                    self.exptime = self.telapse
+                elif self.xposure == 0. and self.telapse <= 0.1:
+                    self.imgtype = 'bias'
+                    self.obstype = 'zero'
+            # Check for biases (shutter did not open)
+            if self.xposure == 0.:
+                self.illum = 'None'
+                if self.telapse > 0.1:
+                    self.imgtype = 'dark'
+                    self.obstype = 'zero'
+                    self.exptime = self.telapse
+                else:
+                    self.imgtype = 'bias'
+                    self.obstype = 'zero'
             # Check for direct mode
             if 'None' in self.grating and self.artang < 5.:
                 self.obstype = 'direct-' + self.obstype
@@ -267,15 +279,12 @@ def header_integrity(hdr):
     return True
 
 
-def read_headers(fspec=None, verbose=False):
+def read_headers(flist=None, verbose=False):
     """ Read in fits files and return array of Observation structures """
 
-    if fspec is None:
-        fspec = './kb*.fits'
-
-    # get file list
-    flist = glob.glob(fspec)
-
+    # check for input list
+    if flist is None:
+        flist = glob.glob("./kb*.fits")
     # loop over files
     oblist = []
     for f in flist:
@@ -292,28 +301,30 @@ def what(oblist):
     """ Print out a summary of each observation in oblist. """
 
     # header
-    hdr = """
-# R = CCD Readout Speed : 0 - slow, 1 - fast
-# G   = Gain multiplier   : 10, 5, 2, 1
-# SSM = Sky, Shuffle, Mask: 0 - no, 1 - yes'
-#  #/   N Imno   Bin AMPS R  G SSM IFU GRAT FILT     Cwave JDobs         Expt Type    Illum     Imno   RA          Dec             PA      Air  Object'"""
-    print(hdr)
+    print("# R   = CCD Readout Speed : 0 - slow, 1 - fast")
+    print("# G   = Gain multiplier   : 10, 5, 2, 1")
+    print("# SSM = Sky, Shuffle, Mask: 0 - no, 1 - yes")
+    print("#  #/   N    Imno Bin AMP R  G SSM IFU GRAT FILT     Cwave JDobs"
+          "         Expt Type    Illum     Imno   RA          Dec            "
+          "PA     Air   Object")
     # how many?
     nobs = len(oblist)
     # loop over oblist
     for n, ob in enumerate(oblist):
         print("%4d/%4d %7d %1d %1d %3s %1d %2d %1d%1d%1d %3s %-4s %-5s %8.1f"
-              "%12.3f%7.1f %-7s %-6s %7d %s" %
+              "%12.3f%7.1f %-7s %-6s %7d%13.8f%13.8f %7.2f %7.3f %s" %
               (n, nobs, ob.imgnum, ob.xbinsize, ob.ybinsize, ob.ampmode,
                ob.ccdmode, ob.gainmul, (1 if ob.skyobs else 0),
                (1 if ob.shuffmod else 0), (1 if ob.nasmask else 0),
-               ob.slicer[:3], ob.grating, ob.filter, ob.cwave, ob.date_obs.jd,
-               ob.exptime, ob.imgtype, ob.illum[:6], ob.imgnum,
-               ob.image_coords.to_string(style='decimal', precision=8)))
+               ob.slicer[:3], ob.grating[:4], ob.filter, ob.cwave,
+               ob.date_obs.jd, ob.exptime, ob.imgtype, ob.illum[:6], ob.imgnum,
+               ob.image_coords.ra.degree, ob.image_coords.dec.degree,
+               ob.rotposn, ob.airmass,
+               (ob.targname if 'object' in ob.imgtype else '-')))
 
 
 if __name__ == '__main__':
 
-    filespec = sys.argv[1]
-    obslist = read_headers(filespec)
+    files = sys.argv[2:]
+    obslist = read_headers(files)
     what(obslist)
