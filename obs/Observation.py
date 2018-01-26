@@ -385,6 +385,8 @@ def read_headers(flist=None, verbose=False):
         ob = Observation(ff[0].header)
         oblist.append(ob)
 
+    oblist.sort(key=lambda x: x.imgnum)
+
     return oblist
 
 
