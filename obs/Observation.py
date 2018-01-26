@@ -20,7 +20,8 @@ class Observation:
     # Basic observation parameters
     object = None  # Object name
     targname = None  # Target name
-    instrument = None
+    instrument = None  # KCWI
+    side = None  # Red or Blue
     observer = None
     airmass = None  # Airmass
     imgnum = None  # image number
@@ -104,7 +105,7 @@ class Observation:
     exptime = None  # Exposure time (s)
 
     def match_bias(self, obs=None):
-        """Does the input observation match at CCD bias level?
+        """Does the input observation match at CCD config level?
 
         Checks the relevant CCD parameters to see if the input observation
         matches such that they could use the same master bias frame.
@@ -124,7 +125,9 @@ class Observation:
                 retval = False
             if self.ccdmode != obs.ccdmode:
                 retval = False
-            if self.xbinsize != obs.xbinsize or self.ybinsize != obs.ybinsize:
+            if self.xbinsize != obs.xbinsize:
+                retval = False
+            if self.ybinsize != obs.ybinsize:
                 retval = False
             if self.gainmul != obs.gainmul:
                 retval = False
@@ -157,7 +160,9 @@ class Observation:
                     retval = False
             # use details of config to match
             else:
-                if self.xbinsize != obs.xbinsize or self.ybinsize != obs.ybinsize:
+                if self.xbinsize != obs.xbinsize:
+                    retval = False
+                if self.ybinsize != obs.ybinsize:
                     retval = False
                 if self.grating not in obs.grating:
                     retval = False
@@ -243,21 +248,38 @@ class Observation:
             self.polang = hdr['CALLANG']
             self.slicer = hdr['IFUNAM']
             self.ifunum = hdr['IFUNUM']
-            self.filter = hdr['BFILTNAM']
-            self.bfiltnum = hdr['BFILTNUM']
-            self.grating = hdr['BGRATNAM']
-            self.gratnum = hdr['BGRATNUM']
-            self.grangle = hdr['BGRANGLE']
-            self.artang = hdr['BARTANG']
-            self.cwave = hdr['BCWAVE']
-            self.pwave = hdr['BPWAVE']
-            self.focus = hdr['BFOCMM']
-            if 'Mask' in hdr['BNASNAM']:
-                self.nasmask = True
-            else:
-                self.nasmask = False
-            # Temperatures
-            self.bccdtemp = hdr['BCCDTMP']
+            if 'BFILTNAM' in hdr:
+                self.side = 'Blue'
+                self.filter = hdr['BFILTNAM']
+                self.bfiltnum = hdr['BFILTNUM']
+                self.grating = hdr['BGRATNAM']
+                self.gratnum = hdr['BGRATNUM']
+                self.grangle = hdr['BGRANGLE']
+                self.artang = hdr['BARTANG']
+                self.cwave = hdr['BCWAVE']
+                self.pwave = hdr['BPWAVE']
+                self.focus = hdr['BFOCMM']
+                if 'Mask' in hdr['BNASNAM']:
+                    self.nasmask = True
+                else:
+                    self.nasmask = False
+                self.bccdtemp = hdr['BCCDTMP']
+            elif 'RFILTNAM' in hdr:
+                self.side = 'Red'
+                self.filter = hdr['RFILTNAM']
+                self.bfiltnum = hdr['RFILTNUM']
+                self.grating = hdr['RGRATNAM']
+                self.gratnum = hdr['RRATNUM']
+                self.grangle = hdr['RGRANGLE']
+                self.artang = hdr['RARTANG']
+                self.cwave = hdr['RCWAVE']
+                self.pwave = hdr['RPWAVE']
+                self.focus = hdr['RFOCMM']
+                if 'Mask' in hdr['RNASNAM']:
+                    self.nasmask = True
+                else:
+                    self.nasmask = False
+                self.bccdtemp = hdr['RCCDTMP']
             self.benchtemp = hdr['TMPA7']
             # Determine illumination: default is 'Test'
             self.illum = 'Test'
@@ -336,10 +358,8 @@ def header_integrity(hdr):
                 'CCDMODE', 'AMPMODE', 'NVIDINP', 'NAMPSXY', 'CCDSUM',
                 'GAINMUL', 'CCDGAIN', 'GAIN1', 'FLIMAGIN', 'FLSPECTR',
                 'HATPOS', 'CALTYPE', 'CALMNAM', 'CALPNAM', 'CALLANG',
-                'IFUNAM', 'IFUNUM', 'BFILTNAM', 'BFILTNUM', 'BGRATNAM',
-                'BGRATNUM', 'BGRANGLE', 'BGRENC', 'BARTANG', 'BARTENC',
-                'BCWAVE', 'BPWAVE', 'BFOCMM', 'BFOCENC', 'BNASNAM',
-                'LMP0STAT', 'LMP0SHST', 'LMP1STAT', 'LMP1SHST', 'LMP3STAT']
+                'IFUNAM', 'IFUNUM', 'LMP0STAT', 'LMP0SHST', 'LMP1STAT',
+                'LMP1SHST', 'LMP3STAT']
 
     # Check keywords
     for k in keys_err:
