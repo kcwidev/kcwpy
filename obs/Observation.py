@@ -146,6 +146,9 @@ class Observation:
 
         Args:
             obs (Observation): observation instance to match against
+            use_id (bool): set to True to use configuration ID to match
+            delang (float): angle matching tolerance in degrees
+            delwave (float): wavelength matching tolerance in Angstroms
 
         Returns:
             bool: True if observation matches otherwise False
